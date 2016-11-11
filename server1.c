@@ -54,6 +54,7 @@ int main(void)
         //print details of the client/peer and the data received
         printf("Received packet from %s:%d\n", inet_ntoa(si_other.sin_addr), ntohs(si_other.sin_port));
         printf("Data: %s\n" , buf);
+        // cho nay se tach message tu client gui den
          
         //now reply the client with the same data
         if (sendto(s, buf, recv_len, 0, (struct sockaddr*) &si_other, slen) == -1)

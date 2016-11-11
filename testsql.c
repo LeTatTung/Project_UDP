@@ -1,6 +1,6 @@
 //lenh chay
 //gcc -o testsql2 testsql2.c `mysql_config --cflags --libs` 
-
+// insert data
 #include <my_global.h>
 #include <mysql.h>
 
@@ -13,6 +13,7 @@ void finish_with_error(MYSQL *con)
 
 int main(int argc, char **argv)
 {
+  //ket noi voi  MySQL database va tao 1 database co ten la testdb
   MYSQL *con = mysql_init(NULL);
   
   if (con == NULL) 
@@ -66,7 +67,7 @@ int main(int argc, char **argv)
   if (mysql_query(con, "INSERT INTO Cars VALUES(8,'Volkswagen',21600)")) {
       finish_with_error(con);
   }
-
+ 
   mysql_close(con);
   exit(0);
 }
