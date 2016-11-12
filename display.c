@@ -45,6 +45,7 @@ void input_data(){
 	scanf("%[^\n]",pass);DEL();
 	printf("\nThong tin cua tai khoan username: %s, pass: %s\n",username,pass );
 }
+
 int main(){
 	int choice1 = display_lock();
 	switch (choice1){
