@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-#define DEL() while (getchar() != '\n')
+#include <string.h>
+#include "define.c"
 
 int display_lock(){
 	int choice; 
@@ -18,7 +19,7 @@ int display_lock(){
     } while (choice < 1 || choice > 3);
 	return choice;
 }
-void display_unlock(){
+int display_unlock(){
 	int choice;
 
 	printf("\t\tClient UDP\n\n");
@@ -35,7 +36,7 @@ void display_unlock(){
     } while (choice < 1 || choice > 4);
 	return choice;
 }
-void input_data(){
+char* input_data(){
 	char username[30];
 	char pass[15];
 	printf("Nhap thong tin cho tai khoan:\n");
@@ -43,14 +44,17 @@ void input_data(){
 	scanf("%[^\n]",username);DEL();
 	printf("\nNhap password: ");
 	scanf("%[^\n]",pass);DEL();
-	printf("\nThong tin cua tai khoan username: %s, pass: %s\n",username,pass );
+
+	return strcat(strcat(username,SLASH),pass);
+	
 }
 
 int main(){
+
 	int choice1 = display_lock();
 	switch (choice1){
 		case 1:
-		input_data();
+		printf("\nThong tin cua tai khoan :%s\n",input_data());
 		break;
 		case 2:
 		break;
