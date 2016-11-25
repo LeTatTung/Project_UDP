@@ -12,7 +12,7 @@ void die(char *s)
     exit(1);
 }
  
-int main(void)
+int client_message(void)
 {
     struct sockaddr_in si_other;
     int s, i, slen=sizeof(si_other);

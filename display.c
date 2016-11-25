@@ -39,27 +39,31 @@ int display_unlock(){
 char* input_data(){
 	char username[30];
 	char pass[15];
+	char *return_value = malloc(sizeof(char)*50);
+	// strcpy(return_value, "abc|abs");
+
 	printf("Nhap thong tin cho tai khoan:\n");
 	printf("Nhap username: ");
 	scanf("%[^\n]",username);DEL();
 	printf("\nNhap password: ");
 	scanf("%[^\n]",pass);DEL();
 
-	return strcat(strcat(username,SLASH),pass);
+	strcpy(return_value,strcat(strcat(username,SLASH),pass));
+	return return_value;
 	
 }
 
-int main(){
+// int main(){
 
-	int choice1 = display_lock();
-	switch (choice1){
-		case 1:
-		printf("\nThong tin cua tai khoan :%s\n",input_data());
-		break;
-		case 2:
-		break;
-		case 3:
-		printf("Exit program !");
-	}
-	return 0;
-}
+// 	int choice1 = display_lock();
+// 	switch (choice1){
+// 		case 1:
+// 		printf("\nThong tin cua tai khoan :%s\n",input_data());
+// 		break;
+// 		case 2:
+// 		break;
+// 		case 3:
+// 		printf("Exit program !");
+// 	}
+// 	return 0;
+// }

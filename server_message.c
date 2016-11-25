@@ -5,7 +5,7 @@
 #include <sys/socket.h>
 #include "define.c"
  
-int main(void)
+int server_message(void)
 {
     struct sockaddr_in si_me, si_other;
      
