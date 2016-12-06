@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "display.c"
 char** str_split(char* a_str, const char a_delim)
 {
     char** result    = 0;
@@ -52,25 +51,25 @@ char** str_split(char* a_str, const char a_delim)
     return result;
 }
 
-int main()
-{
+// int main()
+// {
    
-    char *s = malloc(sizeof(char) * 50);
-    s = input_data();
-    char** tokens;
-    printf("%s\n", s);
-    tokens = str_split(s,'|');
-      if (tokens)
-    {
-        int i;
-        for (i = 0; *(tokens + i); i++)
-        {
-            printf("s=[%s]\n", *(tokens + i));
-            free(*(tokens + i));
-        }
-        printf("\n");
-        free(tokens);
-    }
+//     char *s = malloc(sizeof(char) * 50);
+//     s = input_data();
+//     char** tokens;
+//     printf("%s\n", s);
+//     tokens = str_split(s,'|');
+//       if (tokens)
+//     {
+//         int i;
+//         for (i = 0; *(tokens + i); i++)
+//         {
+//             printf("s=[%s]\n", *(tokens + i));
+//             free(*(tokens + i));
+//         }
+//         printf("\n");
+//         free(tokens);
+//     }
 
-    return 0;
-}
+//     return 0;
+// }
