@@ -40,42 +40,62 @@ int login(int sockfd){
   n=recv(sockfd, mesg, BUFLEN, 0);
   //printf("%s\n", mesg);
   mark= check_mark(mesg);
-  if(mark == 1) {
-    printf("\nDang nhap thanh cong !");
+  if(mark > 0) {
+    printf("\nDang nhap thanh cong !\n\n");
     return 1;
 }
   else {
-    printf("\nTai khoan hoac mat khau khong dung!!");
+    printf("\nTai khoan hoac mat khau khong dung!!\n\n");
     return 0;
 }
 }
 int sign_up(int sockfd){
-   char mesg[BUFLEN];
+  char mesg[BUFLEN];
   int mark,n;
 
   strcpy(mesg,create_message(SIGN_UP, input_data()));
-  send(sockfd, mesg,strlen(mesg), 0);
-  strcpy(mesg,"");
-  n=recv(sockfd, mesg, BUFLEN, 0);
-  mark= check_mark(mesg);
 
-  if(mark == 1) {
-    printf("\nDang ki thanh cong !");
+  send(sockfd, mesg,BUFLEN, 0);
+  //printf("%s\n", mesg);
+  //strcpy(mesg,"");
+  n=recv(sockfd, mesg, BUFLEN, 0);
+  //printf("%s\n", mesg);
+  mark= check_mark(mesg);
+  if(mark >0 ) {
+    printf("\nDang ki tai khoan thanh cong !\n\n");
     return 1;
 }
   else {
-    printf("\nTai khoan da ton tai!!");
+    printf("\nTai khoan da ton tai!!\n\n");
     return 0;
 }
 }
+
 int menu(int sockfd){
 
-   int choice = 0;
+   int choice = 0,i,j;
+   char buf[BUFLEN];
+   char list_file[BUFLEN][BUFLEN];
    do{
     choice = display_unlock();
     switch (choice) {
       // Tien lap them chuc nang cu the vao nhe
         case 1:
+          i = 0;
+          send(sockfd,"LIST",10,0);
+          while(1){
+            recv(sockfd,buf,BUFLEN,0);
+            printf("%s\n", buf);
+            if(strcmp(buf,"ENDLIST") == 0) break;
+            else strcpy(list_file[i++],buf);
+          }
+          if(i == 0){
+            printf("Chua co file\n" );
+          }else printf("List file cua ban :\n");
+          for (j = 0; j < i; j++)
+          {
+            printf("%d. %s\n", j+1,list_file[j]);
+          }
         break;
         case 2:
         break;

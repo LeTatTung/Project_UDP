@@ -12,12 +12,12 @@
 //cau lenh chay server
 // gcc -o server server.c `mysql_config --cflags --libs`
 
-#include "sql.h"
-
+#include "sql.c"
+// LOGIN tra ve id cua tai khoan neu login thanh cong
 int login(char *message){
+
   char *name;
   char *pass;
-  char *s;
   char *mesg =  malloc(sizeof(char) *100);
   char *tmp;
 
@@ -31,25 +31,71 @@ int login(char *message){
   tmp = get_pass_account(connect_mysql(),name);
   if( tmp!= NULL){
     if(strcmp(pass, tmp) == 0){
-      return 1;
+      return get_id_account(connect_mysql(),name);
     }else return 0;
   }
   return -1;
 
 }
+// SIGNUP return id cua tai khoan moi dang ki neu thanh cong
+int sign_up(char *message){
+
+  char *name;
+  char *pass;
+  char *s = malloc(sizeof(char)*3);
+  char *mesg =  malloc(sizeof(char) *100);
+  char *tmp;
+  int id =0;
+  //strcpy(mesg, message);
+  //s = strtok(mesg,"|");
+  //printf("%s\n", s);
+  name = strtok(NULL,"|");
+  printf("%s\n", name);
+  pass = strtok(NULL, "|");
+  printf("%s\n", pass);
+  tmp = get_pass_account(connect_mysql(),name);
+  if(tmp == NULL){
+    // khong ton tai tai khoan trung username.Luc nay moi cho phep tao tk moi
+    id = atoi( get_max_id(connect_mysql())) +1;
+    sprintf(s, "%d", id);
+    printf("%s\n", s);
+    insert_data(connect_mysql(),s, name, pass);
+
+  }
+  return id;
+
+}
+void get_list_file(int sockfd, int id){
+
+  char ** list_file = (char**)malloc(FILE_MAX*sizeof(char*));
+
+  for(int i =0; i< FILE_MAX;i++){
+    list_file[i] = (char*)malloc(sizeof(char)*BUFLEN);
+  }
+
+  int num_file = get_list_file_account(connect_mysql(),id,list_file);
+  for(int i=0; i< num_file; i++){
+    send(sockfd,list_file[i],BUFLEN,0);
+    printf("%s\n", list_file[i]);
+  }
+
+  send(sockfd,"ENDLIST",10,0);
+}
 void main(){
-int listenSock, connSock;
+
+        int listenSock, connSock;
         struct sockaddr_in serv_addr, cliaddr;
         int clientAddrLenght;
         char buf[BUFLEN];
         char tmp[BUFLEN];
-          int t,n;
+        int t,n;
         int recvBytes,sentBytes;
         fd_set readfds,allset;
         int i, maxi,sockfd,nready,connfd;
         int rv;
         struct pollfd client[OPEN_MAX];
         socklen_t     clilen;
+        int array_id[OPEN_MAX]; // mang cac id cua client
 
 
 
@@ -73,8 +119,10 @@ int listenSock, connSock;
         }
         client[0].fd = listenSock;
   client[0].events = POLLRDNORM;
-  for (i = 1; i < OPEN_MAX; i++)
+  for (i = 1; i < OPEN_MAX; i++){
     client[i].fd = -1;    /* -1 indicates available entry */
+    array_id[i] = -1;
+  }
   maxi = 0;         /* max index into client[] array */
 /* end fig01 */
 
@@ -126,10 +174,20 @@ int listenSock, connSock;
             char *s = strtok(buf,"|");
             printf("%s\n", s);
             if(strcmp(s,"LOGIN") == 0){
-              sprintf(tmp,"LOGIN|%d",login(buf));
+              array_id[i] = login(buf);
+              sprintf(tmp,"LOGIN|%d",array_id[i]);
               send(sockfd,tmp,BUFLEN,0);
               printf("%s\n", tmp);
-          }
+            }else if(strcmp(s,"SIGN_UP") == 0){
+              array_id[i] = sign_up(buf);
+              sprintf(tmp,"SIGN_UP|%d",array_id[i]);
+              send(sockfd,tmp,BUFLEN,0);
+              printf("%s\n", tmp);
+            }
+            else if(strcmp(s,"LIST") == 0){
+              // lay ra list cac file
+              get_list_file(sockfd,array_id[i]);
+            }
         }
 
         if (--nready <= 0)

@@ -53,7 +53,7 @@ char** str_split(char* a_str, const char a_delim)
 
 // int main()
 // {
-   
+
 //     char *s = malloc(sizeof(char) * 50);
 //     s = input_data();
 //     char** tokens;
