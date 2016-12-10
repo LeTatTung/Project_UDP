@@ -1,44 +1,53 @@
-int check_string(char buff[]){
+#include <string.h>
+#include "object.c"
+#include "support.c"
 
-  int i;
-
-  for(i=0;i<strlen(buff);i++){
-    if(buff[i] == '|') {
-      printf("\nXau chua ki tu khong duoc cho phep!!");
+int checkInput(char *buff) {
+  int length = PASS_WORD_LEN;
+  for (int i = 0; i < strlen(buff); ++i) {
+    if (buff[i] == ' ') {
       return 0;
     }
   }
-  return 1;
+  return (strlen(buff) >= 1 && strlen(buff) <= length);
 }
-int check_input(char buff[]){
-  int i;
 
-  if(strlen(buff)<=1 || strlen(buff)>=30) return 0;
-  else return 1;
-
+// Kiem tra do dai ten file toi da
+int checkFileNameLength(char *fileName) {
+  return (strlen(fileName) <= FILE_NAME_LEN);
 }
-char* input_data(){
-	char username[30];
-	char pass[30];
-	char *return_value = malloc(sizeof(char)*70);
-	// strcpy(return_value, "abc|abs");
 
-	printf("Nhap thong tin cho tai khoan:\n");
-	while(1){
-	printf("Nhap username: ");
-	scanf("%[^\n]",username);DEL();
-	if(check_string(username) == 0 || check_input(username) == 0){
-		printf("\nDau vao sai.Moi nhap lai!!\n");
-	}else break;
-}
-	while(1){
-	printf("\nNhap password: ");
-	scanf("%[^\n]",pass);DEL();
-	if(check_string(pass) == 0 || check_input(pass) == 0){
-		printf("\nDau vao sai.Moi nhap lai!!\n");
-	}else break;
-}
-	strcpy(return_value,strcat(strcat(username,SLASH),pass));
-	return return_value;
+Object inputData() {
+  Object object;
 
+  printf("Nhap thong tin cho tai khoan\n");
+  while(1) {
+    printf("Nhap username: ");
+    scanf("%[^\n]", object.userName); DEL();
+    if(!checkInput(object.userName)) {
+      printf("Dau vao sai. Moi nhap lai!!\n");
+    } else break;
+  }
+
+  while(1) {
+    printf("Nhap password: ");
+    scanf("%[^\n]", object.passWord); DEL();
+    if(!checkInput(object.passWord)) {
+      printf("Dau vao sai. Moi nhap lai!!\n");
+    } else break;
+  }
+
+  return object;
+}
+
+Object inputFile(Object object) {
+  int checkLength = 0;
+  char str[FILE_NAME_LEN];
+  do {
+    printf("Nhap ten file: ");
+    scanf("%[^\n]", object.fileName); DEL();
+    strcpy(str, object.fileName);
+    checkLength = checkFileNameLength(convertFileName(str));
+  } while(!checkLength);
+  return object;
 }

@@ -1,220 +1,203 @@
+//cau lenh chay server
+// gcc -o server server.c ./src/libunp.a `mysql_config --cflags --libs`
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-/* include fig01 */
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <errno.h>
 #include <poll.h>
 
-//cau lenh chay server
-// gcc -o server server.c `mysql_config --cflags --libs`
-
+#include "define.c"
+#include "src/lib/unp.h"
 #include "sql.c"
-// LOGIN tra ve id cua tai khoan neu login thanh cong
-int login(char *message){
+#include "support.c"
 
-  char *name;
-  char *pass;
-  char *mesg =  malloc(sizeof(char) *100);
-  char *tmp;
+// Gui respone thanh cong/ that bai ve cho client ------------------------------
 
-  //strcpy(mesg, message);
-  //s = strtok(mesg,"|");
-  //printf("%s\n", s);
-  name = strtok(NULL,"|");
-  printf("%s\n", name);
-  pass = strtok(NULL, "|");
-  printf("%s\n", pass);
-  tmp = get_pass_account(connect_mysql(),name);
-  if( tmp!= NULL){
-    if(strcmp(pass, tmp) == 0){
-      return get_id_account(connect_mysql(),name);
-    }else return 0;
-  }
-  return -1;
-
+//Gui phan hoi de thong bao da ok
+void sendResponeSuccess(int connfd, Object obj) {
+  obj.status = 1;
+  send(connfd, &obj, sizeof(obj), 0);
 }
-// SIGNUP return id cua tai khoan moi dang ki neu thanh cong
-int sign_up(char *message){
 
-  char *name;
-  char *pass;
-  char *s = malloc(sizeof(char)*3);
-  char *mesg =  malloc(sizeof(char) *100);
-  char *tmp;
-  int id =0;
-  //strcpy(mesg, message);
-  //s = strtok(mesg,"|");
-  //printf("%s\n", s);
-  name = strtok(NULL,"|");
-  printf("%s\n", name);
-  pass = strtok(NULL, "|");
-  printf("%s\n", pass);
-  tmp = get_pass_account(connect_mysql(),name);
-  if(tmp == NULL){
-    // khong ton tai tai khoan trung username.Luc nay moi cho phep tao tk moi
-    id = atoi( get_max_id(connect_mysql())) +1;
-    sprintf(s, "%d", id);
-    printf("%s\n", s);
-    insert_data(connect_mysql(),s, name, pass);
-
-  }
-  return id;
-
+//Gui phan hoi de thong bao da ok
+void sendResponeFailure(int connfd, Object obj) {
+  obj.status = 0;
+  send(connfd, &obj, sizeof(obj), 0);
 }
-void get_list_file(int sockfd, int id){
 
-  char ** list_file = (char**)malloc(FILE_MAX*sizeof(char*));
+// Thuc hien yeu cau cua client ------------------------------------------------
 
-  for(int i =0; i< FILE_MAX;i++){
-    list_file[i] = (char*)malloc(sizeof(char)*BUFLEN);
+// Gui file cho client
+int sendFile(int connfd, Object *obj) {
+  char* path = (char*)malloc(sizeof(char) * PATH_LEN);
+  char* id = (char*)malloc(sizeof(char) * ID_LEN);
+  sprintf(id, "%d", obj->userID);
+  strcpy(path, UPLOADS);
+  strcat(path, id);
+  strcat(path, "/");
+  strcat(path, obj->fileName);
+  FILE *file = fopen(path, "rb");
+  if (file == NULL) {
+    return 0;
+  } else {
+    fseek(file, 0L, SEEK_END);
+    int length = ftell(file);
+    obj->fileSize = length;
+    rewind(file);
+    while(fread(obj->file, obj->fileSize, 1, file));
   }
-
-  int num_file = get_list_file_account(connect_mysql(),id,list_file);
-  for(int i=0; i< num_file; i++){
-    send(sockfd,list_file[i],BUFLEN,0);
-    printf("%s\n", list_file[i]);
-  }
-
-  send(sockfd,"ENDLIST",10,0);
+  fclose(file);
+  return 1;
 }
-void main(){
 
-        int listenSock, connSock;
-        struct sockaddr_in serv_addr, cliaddr;
-        int clientAddrLenght;
-        char buf[BUFLEN];
-        char tmp[BUFLEN];
-        int t,n;
-        int recvBytes,sentBytes;
-        fd_set readfds,allset;
-        int i, maxi,sockfd,nready,connfd;
-        int rv;
-        struct pollfd client[OPEN_MAX];
-        socklen_t     clilen;
-        int array_id[OPEN_MAX]; // mang cac id cua client
-
-
-
-
-        serv_addr.sin_family = AF_INET;
-        serv_addr.sin_addr.s_addr = INADDR_ANY;
-        serv_addr.sin_port = htons(PORT);
-
-
-        if((listenSock = socket(AF_INET, SOCK_STREAM, 0)) == -1){
-            printf("\nTao socket loi!!\n");
-            return;
-        }
-        if(bind(listenSock, (struct sockaddr *) &serv_addr,sizeof(serv_addr))<0) {
-            printf("\nBind loi!!\n");
-            return;
-            }
-        if(listen(listenSock, 10) == -1) {
-            printf("\nListen loi!!\n");
-            return;
-        }
-        client[0].fd = listenSock;
-  client[0].events = POLLRDNORM;
-  for (i = 1; i < OPEN_MAX; i++){
-    client[i].fd = -1;    /* -1 indicates available entry */
-    array_id[i] = -1;
+// Gui danh sach file cho client
+int sendListFile(int connfd, Object *obj) {
+  Object object = getListFile(connectMysql(), obj->userID);
+  if (object.sizeListFile == 0) {
+    return 0;
   }
-  maxi = 0;         /* max index into client[] array */
-/* end fig01 */
+  obj->sizeListFile = object.sizeListFile;
+  memcpy(obj->listFile, object.listFile, sizeof(object.listFile));
+  return 1;
+}
 
-/* include fig02 */
-  for ( ; ; ) {
-    nready = poll(client, maxi+1, 3);
+// kiem tra login tu client
+int logIn(Object *obj) {
+  Object object = getAccount(connectMysql(), obj->userName);
+  if (object.userID == 0) {
+    return 0;
+  }
+  if (strcompare(object.passWord, obj->passWord)) {
+    obj->userID = object.userID;
+    return 1;
+  }
+  return 0;
+}
 
-    if (client[0].revents & POLLRDNORM) { /* new client connection */
-      clilen = sizeof(cliaddr);
-      connfd = accept(listenSock, (struct sockaddr *) &cliaddr, &clilen);
-      //printf("new client: %s\n", Sock_ntop((SA *) &cliaddr, clilen));
+// kiem tra login tu client
+int signUp(Object *obj) {
+  Object object = getAccount(connectMysql(), obj->userName);
+  char* id = malloc(sizeof(char) * ID_LEN);
+  char* table = malloc(sizeof(char) * TABLE_LEN);
+  strcpy(table, "users");
 
-      for (i = 1; i < OPEN_MAX; i++)
-        if (client[i].fd < 0) {
-          client[i].fd = connfd;  /* save descriptor */
-          break;
-        }
-      if (i == OPEN_MAX)
-        printf("too many clients");
+  // neu chua co pass tuc la chua co account
+  if (object.userID == 0) {
+    obj->userID = getMaxId(connectMysql(), table) + 1;
+    sprintf(id, "%d", obj->userID);
+    insertUser(connectMysql(), id, obj->userName, obj->passWord);
 
-      client[i].events = POLLRDNORM;
-      if (i > maxi)
-        maxi = i;       /* max index in client[] array */
-
-      if (--nready <= 0)
-        continue;       /* no more readable descriptors */
+    struct stat st = {0};
+    char *path = malloc(sizeof(char) * PATH_LEN);
+    strcpy(path, UPLOADS);
+    strcat(path, id);
+    if (stat(path, &st) == -1) {
+      mkdir(path, 0700);
     }
+    return 1;
+  }
+  return 0;
+}
 
-    for (i = 1; i <= maxi; i++) { /* check all clients for data */
-      if ( (sockfd = client[i].fd) < 0)
-        continue;
-      if (client[i].revents & (POLLRDNORM | POLLERR)) {
-        if ( (n = recv(sockfd, buf, BUFLEN,0)) < 0) {
-          if (errno == ECONNRESET) {
-              /*4connection reset by client */
-            printf("client[%d] aborted connection\n", i);
-            close(sockfd);
-            client[i].fd = -1;
-          } else
-            printf("read error");
-        } else if (n == 0) {
-            /*4connection closed by client */
-          printf("client[%d] closed connection\n", i);
-          close(sockfd);
-          client[i].fd = -1;
-        } else
-          {
-            printf("\nXau nhan tu Client: %s\n",buf );
-            char *s = strtok(buf,"|");
-            printf("%s\n", s);
-            if(strcmp(s,"LOGIN") == 0){
-              array_id[i] = login(buf);
-              sprintf(tmp,"LOGIN|%d",array_id[i]);
-              send(sockfd,tmp,BUFLEN,0);
-              printf("%s\n", tmp);
-            }else if(strcmp(s,"SIGN_UP") == 0){
-              array_id[i] = sign_up(buf);
-              sprintf(tmp,"SIGN_UP|%d",array_id[i]);
-              send(sockfd,tmp,BUFLEN,0);
-              printf("%s\n", tmp);
-            }
-            else if(strcmp(s,"LIST") == 0){
-              // lay ra list cac file
-              get_list_file(sockfd,array_id[i]);
-            }
+// Nhan file tu client
+int saveFile(Object obj) {
+  char* userid = malloc(sizeof(char) * ID_LEN);
+  char* table = malloc(sizeof(char) * TABLE_LEN);
+  strcpy(table, "userfiles");
+  sprintf(userid, "%d", obj.userID);
+  char* path = malloc(sizeof(char) * PATH_LEN);
+  strcpy(path, UPLOADS);
+  strcat(path, userid);
+  strcat(path, "/");
+  strcat(path, obj.fileName);
+  FILE *file = fopen(path, "wb");
+  if (file) {
+    fwrite(obj.file, obj.fileSize, 1, file);
+    fclose(file);
+    char* id = malloc(sizeof(char) * ID_LEN);
+    int _id = getMaxId(connectMysql(), table) + 1;
+    sprintf(id, "%d", _id);
+    insertUserFile(connectMysql(), id, obj.fileName, userid);
+    return 1;
+  }
+  return 0;
+}
+
+// Lang nghe trao doi voi client -----------------------------------------------
+
+// Trao doi du lieu voi client
+void exchangeClient(int connfd) {
+  Object obj;
+  int status;
+  for( ; ; ) {
+    while(recv(connfd, &obj, sizeof(Object), 0)) {
+      if (strcompare(obj.method, "GET")) {
+        if (strcompare(obj.typeData, "DATA")) {
+          status = sendFile(connfd, &obj);
+        } else if (strcompare(obj.typeData, "DATAS")) {
+          status = sendListFile(connfd, &obj);
         }
-
-        if (--nready <= 0)
-          break;        /* no more readable descriptors */
+      } else if (strcompare(obj.method, "POST")) {
+          if (strcompare(obj.typeData, "LOG_IN")) {
+            status = logIn(&obj);
+          } else if (strcompare(obj.typeData, "SIGN_UP")) {
+            status = signUp(&obj);
+          } else if (strcompare(obj.typeData, "DATA")) {
+            status = saveFile(obj);
+          }
+      }
+      if (status) {
+        sendResponeSuccess(connfd, obj);
+      } else {
+        sendResponeFailure(connfd, obj);
       }
     }
   }
 }
-  /*                      printf("\nXau nhan tu Client: %s",buf );
-                        //if(strcmp(strtok(buf,"|"),"LOGIN") == 0){
-            //sprintf(tmp,"LOGIN|%d",login(buf));
-              //writen(sockfd,tmp,BUFLEN);
-              //printf("%s\n", tmp);
-           // }
-                    }
 
-                if(--rv <= 0)
-                    break;
-                }
-            }
+// Server bat dau lang nghe
+void initSocket() {
+  int listenfd;
+  pid_t childpid, connfd;
+  socklen_t clilen;
+  struct sockaddr_in  cliaddr, servaddr;
+  void sig_chld(int);
 
+  listenfd = socket(AF_INET, SOCK_STREAM, 0);
 
-    }//end while
-}//end mains
+  bzero(&servaddr, sizeof(servaddr));
+  servaddr.sin_family = AF_INET;
+  servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+  servaddr.sin_port = htons(PORT);
 
+  bind(listenfd, (SA *) &servaddr, sizeof(servaddr));
 
-          // Xu ly o trong day
+  listen(listenfd, LISTENQ);
 
+  for ( ; ; ) {
+    clilen = sizeof(cliaddr);
+    if ((connfd = accept(listenfd, (SA *) &cliaddr, &clilen)) < 0) {
+      if (errno == EINTR)
+        continue;
+      else
+        err_sys(ERROR_ACCEPT);
+    }
 
-*/
+    if ((childpid = Fork()) == 0) {
+      close(listenfd);
+      exchangeClient(connfd);
+      exit(0);
+    }
+    close(connfd);
+  }
+}
+
+void main() {
+  initSocket();
+}

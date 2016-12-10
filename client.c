@@ -1,160 +1,278 @@
+//cau lenh chay server
+// gcc -o client client.c
+
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <netdb.h>
-#include <arpa/inet.h>
 #include <errno.h>
-#include <poll.h>
-#include <sys/select.h>
 
-#include "define.c"
-#include "input.c"
-#include "string_handling.c"
+#include "src/lib/unp.h"
 #include "display.c"
+#include "input.c"
 
-int check_mark(char* message){
+int status = 0;
+int userID = 0;
 
-  for(int i =0; i< strlen(message);i++){
-    if(message[i] == '|'){
-     if(message[i+1] == '1')
-      return 1;
-    else
-      return 0;
+// Xu li phu phan tra ve -------------------------------------------------------------------
+
+// Kiem tra log in hay chua
+int userSignedIn() {
+  return status;
+}
+
+// Luu file khi tai ve
+void saveFile(Object obj) {
+  char* userid = malloc(sizeof(char) * ID_LEN);
+  sprintf(userid, "%d", obj.userID);
+  char* path = malloc(sizeof(char) * PATH_LEN);
+  strcpy(path, DOWNLOADS);
+  strcat(path, userid);
+  struct stat st = {0};
+  if (stat(path, &st) == -1) {
+    mkdir(path, 0700);
+  }
+  strcat(path, "/");
+  strcat(path, obj.fileName);
+  FILE *file = fopen(path, "wb");
+  if (file) {
+    fwrite(obj.file, obj.fileSize, 1, file);
+    fclose(file);
+  }
+}
+
+// Hien thi danh sach file da upload
+void printListFile(Object obj) {
+  for (int i = 0; i < obj.sizeListFile; ++i)
+  {
+    printf("%d. %s\n", i + 1, obj.listFile[i]);
+  }
+  printf("\n");
+}
+
+// Thiet lap du lieu khi login thanh cong
+void loggedIn(Object obj) {
+  status = 1;
+  userID = obj.userID;
+}
+
+// Thiet lap du lieu khi signup thanh cong
+void signedUp(Object obj) {
+  status = 1;
+  userID = obj.userID;
+}
+
+// Thiet lap du lieu khi dang xuat
+void loggedOut() {
+  status = 0;
+  userID = 0;
+}
+
+// Nhan du lieu tra ve ---------------------------------------------------------
+
+// Respone getFile
+void responeGetFile(Object obj) {
+  if (obj.status) {
+    printf("%s\n", GET_FILE_SUCCESS);
+    saveFile(obj);
+  } else {
+    printf("%s\n", GET_FILE_FAIL);
+  }
+}
+
+// Respone getListFile
+void responeGetListFile(Object obj) {
+  if (obj.status) {
+    printf("%s\n", GET_LIST_FILE_SUCCESS);
+    printListFile(obj);
+  } else {
+    printf("%s\n", GET_LIST_FILE_FAIL);
+  }
+}
+
+// Respone login
+void responeLogin(Object obj) {
+  if (obj.status) {
+    printf("%s\n", LOG_IN_SUCCESS);
+    loggedIn(obj);
+  } else {
+    printf("%s\n", LOG_IN_FAIL);
+  }
+}
+
+// Respone signup
+void responeSignUp(Object obj) {
+  if (obj.status) {
+    printf("%s\n", SIGN_UP_SUCCESS);
+    signedUp(obj);
+  } else {
+    printf("%s\n", SIGN_UP_FAIL);
+  }
+}
+
+// Respone up file
+void responeUpFile(Object obj) {
+  if(obj.status) {
+    printf("%s\n", UP_FILE_SUCCESS);
+  } else {
+    printf("%s\n", UP_FILE_FAIL);
+  }
+}
+
+// Gui du lieu di --------------------------------------------------------------
+
+// Gui yeu cau lay file
+void getFile(int sockfd, Object obj) {
+  obj.userID = userID;
+  strcpy(obj.method, "GET");
+  strcpy(obj.typeData, "DATA");
+  strcpy(obj.fileName, convertFileName(obj.fileName));
+  send(sockfd, &obj, sizeof(obj), 0);
+}
+
+// Gui yeu cau lay danh sach file
+void getListFile(int sockfd, Object obj) {
+  obj.userID = userID;
+  strcpy(obj.method, "GET");
+  strcpy(obj.typeData, "DATAS");
+  send(sockfd, &obj, sizeof(obj), 0);
+}
+
+// ham login
+void logIn(int sockfd, Object obj) {
+  strcpy(obj.method, "POST");
+  strcpy(obj.typeData, "LOG_IN");
+  send(sockfd, &obj, sizeof(obj), 0);
+}
+
+// ham sign up
+void signUp(int sockfd, Object obj) {
+  strcpy(obj.method, "POST");
+  strcpy(obj.typeData, "SIGN_UP");
+  send(sockfd, &obj, sizeof(obj), 0);
+}
+
+// ham send file
+int sendFile(int sockfd, Object obj) {
+  obj.userID = userID;
+  strcpy(obj.method, "POST");
+  strcpy(obj.typeData, "DATA");
+
+  FILE *file = fopen(obj.fileName, "rb");
+  if (file == NULL) {
+    printf("%s\n", FILE_NOT_FOUND);
+    return 0;
+  } else {
+    fseek(file, 0L, SEEK_END);
+    int length = ftell(file);
+    obj.fileSize = length;
+    rewind(file);
+    strcpy(obj.fileName, convertFileName(obj.fileName));
+    while(fread(obj.file, obj.fileSize, 1, file));
+    send(sockfd, &obj, sizeof(obj), 0);
+  }
+  fclose(file);
+  return 1;
+}
+
+
+// Lang nghe repsone tu server -------------------------------------------------
+
+// Trao doi du lieu voi server
+void exchangeServer(int sockfd) {
+  Object obj;
+  for ( ; ; ) {
+    while(recv(sockfd, &obj, sizeof(Object), 0)) {
+      if (strcompare(obj.method, "GET")) {
+        if (strcompare(obj.typeData, "DATA")) {
+          responeGetFile(obj);
+        } else if (strcompare(obj.typeData, "DATAS")) {
+          responeGetListFile(obj);
+        }
+      } else if (strcompare(obj.method, "POST")) {
+          if (strcompare(obj.typeData, "LOG_IN")) {
+            responeLogin(obj);
+          } else if (strcompare(obj.typeData, "SIGN_UP")) {
+            responeSignUp(obj);
+          } else if (strcompare(obj.typeData, "DATA")) {
+            responeUpFile(obj);
+          }
+      }
+      break;
+    }
+    break;
+  }
+}
+
+// ham khoi tao socket
+int initSocket() {
+  int sockfd;
+  struct sockaddr_in servaddr;
+
+  sockfd = socket(AF_INET, SOCK_STREAM, 0);
+  bzero(&servaddr, sizeof(servaddr));
+  servaddr.sin_family = AF_INET;
+  servaddr.sin_port = htons(PORT);
+  inet_pton(AF_INET, ADDR_SERVER, &servaddr.sin_addr);
+  connect(sockfd, (SA *) &servaddr, sizeof(servaddr));
+
+  return sockfd;
+}
+
+void menu(int sockfd) {
+  int choice = 0;
+  Object obj;
+
+  start: while (!userSignedIn()) {
+    choice = displayLock();
+    switch(choice) {
+      case 1:
+        obj = inputData();
+        signUp(sockfd, obj);
+        exchangeServer(sockfd);
+        break;
+      case 2:
+        obj = inputData();
+        logIn(sockfd, obj);
+        exchangeServer(sockfd);
+        break;
+      case 3:
+        exit(0);
+        break;
     }
   }
-  return 0;
-}
-int login(int sockfd){
-  char mesg[BUFLEN];
-  int mark,n;
 
-  strcpy(mesg,create_message(LOGIN, input_data()));
-
-  send(sockfd, mesg,BUFLEN, 0);
-  //printf("%s\n", mesg);
-  //strcpy(mesg,"");
-  n=recv(sockfd, mesg, BUFLEN, 0);
-  //printf("%s\n", mesg);
-  mark= check_mark(mesg);
-  if(mark > 0) {
-    printf("\nDang nhap thanh cong !\n\n");
-    return 1;
-}
-  else {
-    printf("\nTai khoan hoac mat khau khong dung!!\n\n");
-    return 0;
-}
-}
-int sign_up(int sockfd){
-  char mesg[BUFLEN];
-  int mark,n;
-
-  strcpy(mesg,create_message(SIGN_UP, input_data()));
-
-  send(sockfd, mesg,BUFLEN, 0);
-  //printf("%s\n", mesg);
-  //strcpy(mesg,"");
-  n=recv(sockfd, mesg, BUFLEN, 0);
-  //printf("%s\n", mesg);
-  mark= check_mark(mesg);
-  if(mark >0 ) {
-    printf("\nDang ki tai khoan thanh cong !\n\n");
-    return 1;
-}
-  else {
-    printf("\nTai khoan da ton tai!!\n\n");
-    return 0;
-}
-}
-
-int menu(int sockfd){
-
-   int choice = 0,i,j;
-   char buf[BUFLEN];
-   char list_file[BUFLEN][BUFLEN];
-   do{
-    choice = display_unlock();
-    switch (choice) {
-      // Tien lap them chuc nang cu the vao nhe
-        case 1:
-          i = 0;
-          send(sockfd,"LIST",10,0);
-          while(1){
-            recv(sockfd,buf,BUFLEN,0);
-            printf("%s\n", buf);
-            if(strcmp(buf,"ENDLIST") == 0) break;
-            else strcpy(list_file[i++],buf);
-          }
-          if(i == 0){
-            printf("Chua co file\n" );
-          }else printf("List file cua ban :\n");
-          for (j = 0; j < i; j++)
-          {
-            printf("%d. %s\n", j+1,list_file[j]);
-          }
+  while (userSignedIn()) {
+    choice = displayUnlock();
+    switch(choice) {
+      case 1:
+        getListFile(sockfd, obj);
+        exchangeServer(sockfd);
         break;
-        case 2:
+      case 2:
+        obj = inputFile(obj);
+        getFile(sockfd, obj);
+        exchangeServer(sockfd);
         break;
-        case 3:
+      case 3:
+        obj = inputFile(obj);
+        if (sendFile(sockfd, obj)) {
+          exchangeServer(sockfd);
+        }
         break;
-        case 4:
-          printf("Go to Home\n\n");
-        return 1;
-        default:
+      case 4:
+        loggedOut();
+        goto start;
         break;
     }
-   }while(choice !=4);
+  }
 }
 
-
-void main(){
-
-  int sockfd,sentBytes, recvBytes,n=0,port;
-  struct sockaddr_in serv_addr;
-  char mesg[BUFLEN];
-  char recv_b[BUFLEN];
-  int choice, check;
-
-  serv_addr.sin_family = AF_INET;
-  serv_addr.sin_port = htons(PORT);
-  inet_pton(AF_INET, SERVER, &serv_addr.sin_addr);
-  size_t size =100;
-
-  if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
-        printf("\nLoi tao socket!!");
-    }
-    if( connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-    {
-       printf("\nXay ra loi ket noi!!\n");
-       return ;
-    }else
-    while(1){
-        choice = display_lock();
-        switch (choice) {
-    case 1:
-    check = sign_up(sockfd);
-    if(check == 1){
-        menu(sockfd);
-    }
-      break;
-    case 2:
-    check = login(sockfd);
-  //  printf("%d\n", sockfd);
-    if(check == 1){
-        menu(sockfd);
-    }
-      break;
-    case 3:
-    printf("Ket thuc chuong trinh.\n");
-      break;
-
-    }
-    if(choice == 3)
-      break;
-    }
-
+void main() {
+  int sockfd = initSocket();
+  menu(sockfd);
 }
